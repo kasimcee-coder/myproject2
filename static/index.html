@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#11131a">
+    <title>Calculator</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #11131a;
+        color: #f5f6fb;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        padding: 24px;
+        place-items: center;
+        background:
+          radial-gradient(ellipse at 18% 15%, rgb(91 77 218 / 18%), transparent 38%),
+          radial-gradient(ellipse at 86% 85%, rgb(31 163 151 / 12%), transparent 34%),
+          #11131a;
+      }
+
+      .calculator {
+        width: min(100%, 368px);
+        padding: 26px;
+        border: 1px solid rgb(255 255 255 / 9%);
+        border-radius: 28px;
+        background: rgb(26 29 39 / 92%);
+        box-shadow: 0 28px 80px rgb(0 0 0 / 42%);
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        color: #a7adbd;
+        font-size: 13px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #82d6bb;
+        font-size: 11px;
+        letter-spacing: .06em;
+      }
+
+      .status::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        content: "";
+      }
+
+      .screen {
+        display: flex;
+        min-height: 130px;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: flex-end;
+        overflow: hidden;
+        padding: 12px 0 24px;
+      }
+
+      .expression {
+        min-height: 24px;
+        color: #8d94a6;
+        font-size: 15px;
+      }
+
+      .display {
+        width: 100%;
+        overflow: hidden;
+        color: #f6f7fb;
+        font-size: clamp(42px, 13vw, 58px);
+        font-variant-numeric: tabular-nums;
+        font-weight: 300;
+        letter-spacing: -.055em;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .error { color: #ff9a9a; }
+
+      .keys {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 11px;
+      }
+
+      button {
+        min-width: 0;
+        aspect-ratio: 1;
+        border: 0;
+        border-radius: 18px;
+        background: #292d3a;
+        color: #f1f2f7;
+        cursor: pointer;
+        font: inherit;
+        font-size: 21px;
+        transition: background 140ms ease, transform 140ms ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      button:hover { background: #363b4b; }
+      button:active { transform: scale(.95); }
+      button:focus-visible { outline: 2px solid #9a8cff; outline-offset: 3px; }
+      button.utility { background: #373b49; color: #c1c5d2; }
+      button.operator { background: #343148; color: #b7aaff; font-size: 25px; }
+      button.operator.selected { background: #6f5ce0; color: #fff; }
+      button.equals { background: #7562e8; color: #fff; font-size: 25px; }
+      button.equals:hover { background: #8574ef; }
+
+      @media (max-width: 380px) {
+        .calculator { padding: 20px; }
+        .keys { gap: 9px; }
+        button { border-radius: 15px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="calculator" aria-label="Calculator">
+      <header class="header">
+        <span>Calculator</span>
+        <span class="status" id="status">Ready</span>
+      </header>
+      <section class="screen" aria-live="polite" aria-atomic="true">
+        <div class="expression" id="expression"></div>
+        <div class="display" id="display">0</div>
+      </section>
+      <section class="keys" aria-label="Calculator keys">
+        <button class="utility" data-action="clear" aria-label="Clear">AC</button>
+        <button class="utility" data-action="sign" aria-label="Change sign">±</button>
+        <button class="utility" data-action="percent" aria-label="Percent">%</button>
+        <button class="operator" data-operator="/" aria-label="Divide">÷</button>
+
+        <button data-digit="7">7</button>
+        <button data-digit="8">8</button>
+        <button data-digit="9">9</button>
+        <button class="operator" data-operator="*" aria-label="Multiply">×</button>
+
+        <button data-digit="4">4</button>
+        <button data-digit="5">5</button>
+        <button data-digit="6">6</button>
+        <button class="operator" data-operator="-" aria-label="Subtract">−</button>
+
+        <button data-digit="1">1</button>
+        <button data-digit="2">2</button>
+        <button data-digit="3">3</button>
+        <button class="operator" data-operator="+" aria-label="Add">+</button>
+
+        <button class="utility" data-action="backspace" aria-label="Backspace">⌫</button>
+        <button data-digit="0">0</button>
+        <button data-action="decimal" aria-label="Decimal point">.</button>
+        <button class="equals" data-action="equals" aria-label="Equals">=</button>
+      </section>
+    </main>
+    <script>
+      const display = document.querySelector("#display");
+      const expression = document.querySelector("#expression");
+      const status = document.querySelector("#status");
+      const operatorButtons = document.querySelectorAll("[data-operator]");
+      let accumulator = null;
+      let pendingOperator = null;
+      let replaceDisplay = false;
+      let busy = false;
+
+      function currentValue() {
+        return Number(display.textContent);
+      }
+
+      function showValue(value) {
+        display.classList.remove("error");
+        display.textContent = String(Number(value.toPrecision(12)));
+      }
+
+      function setBusy(value) {
+        busy = value;
+        status.textContent = value ? "Calculating" : "Ready";
+        document.querySelectorAll("button").forEach((button) => {
+          button.disabled = value;
+        });
+      }
+
+      function clear() {
+        accumulator = null;
+        pendingOperator = null;
+        replaceDisplay = false;
+        expression.textContent = "";
+        operatorButtons.forEach((button) => button.classList.remove("selected"));
+        showValue(0);
+      }
+
+      function enterDigit(digit) {
+        if (replaceDisplay || display.classList.contains("error")) {
+          display.textContent = digit;
+          display.classList.remove("error");
+          replaceDisplay = false;
+        } else if (display.textContent === "0") {
+          display.textContent = digit;
+        } else if (display.textContent.replace("-", "").length < 15) {
+          display.textContent += digit;
+        }
+      }
+
+      function enterDecimal() {
+        if (replaceDisplay || display.classList.contains("error")) {
+          display.textContent = "0";
+          display.classList.remove("error");
+          replaceDisplay = false;
+        }
+        if (!display.textContent.includes(".")) display.textContent += ".";
+      }
+
+      async function selectOperator(operator) {
+        if (pendingOperator && !replaceDisplay) {
+          await calculate(false);
+          if (display.classList.contains("error")) return;
+        }
+        accumulator = currentValue();
+        pendingOperator = operator;
+        replaceDisplay = true;
+        expression.textContent = `${display.textContent} ${operator}`;
+        operatorButtons.forEach((button) => {
+          button.classList.toggle("selected", button.dataset.operator === operator);
+        });
+      }
+
+      async function calculate(finish = true) {
+        if (accumulator === null || pendingOperator === null || busy) return;
+        const left = accumulator;
+        const right = currentValue();
+        const operator = pendingOperator;
+        expression.textContent = `${left} ${operator} ${right} =`;
+        setBusy(true);
+        try {
+          const response = await fetch("/api/calc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ left, operator, right }),
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.detail || "Calculation failed");
+          showValue(payload.result);
+          accumulator = payload.result;
+          replaceDisplay = true;
+          if (finish) {
+            pendingOperator = null;
+            operatorButtons.forEach((button) => button.classList.remove("selected"));
+          }
+        } catch (error) {
+          display.textContent = error.message;
+          display.classList.add("error");
+          accumulator = null;
+          pendingOperator = null;
+          operatorButtons.forEach((button) => button.classList.remove("selected"));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function handleAction(action) {
+        if (action === "clear") clear();
+        if (action === "sign" && !display.classList.contains("error")) {
+          showValue(-currentValue());
+        }
+        if (action === "percent" && !display.classList.contains("error")) {
+          showValue(currentValue() / 100);
+        }
+        if (action === "decimal") enterDecimal();
+        if (action === "backspace" && !replaceDisplay) {
+          const value = display.textContent;
+          display.textContent = value.length > 1 ? value.slice(0, -1) : "0";
+        }
+        if (action === "equals") calculate();
+      }
+
+      document.querySelector(".keys").addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button || busy) return;
+        if (button.dataset.digit !== undefined) enterDigit(button.dataset.digit);
+        else if (button.dataset.operator) selectOperator(button.dataset.operator);
+        else handleAction(button.dataset.action);
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (busy) return;
+        if (/^[0-9]$/.test(event.key)) enterDigit(event.key);
+        else if (event.key === ".") enterDecimal();
+        else if (["+", "-", "*", "/"].includes(event.key)) selectOperator(event.key);
+        else if (event.key === "Enter" || event.key === "=") calculate();
+        else if (event.key === "Escape") clear();
+        else if (event.key === "Backspace") handleAction("backspace");
+      });
+    </script>
+  </body>
+</html>
